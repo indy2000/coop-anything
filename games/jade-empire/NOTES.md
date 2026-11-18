@@ -497,3 +497,53 @@ Our code now lives in https://github.com/indy2000/jade-empire-coop (MIT; no game
 SHA-256 `ebab8eee…46b593c7` for the v0.5 source), `tools/ncsasm.py`, `client/` tests.
 Note: the v0.5 DLL deployed in the test installs (`6412d829…`) was built before `/Brepro`,
 so its hash differs from the repo build of the same source.
+
+### Game-to-game sync without the agent relay (jebridge v0.6, `dll/netsync.inc`)
+Design: with `bridge\net.txt` (`local <port>`, `peer <ip> <port>`, `template <resref>`)
+and after `je.netStart`, each game reads its player position with DLL-built in-memory
+scripts, sends it over UDP (24-byte packet, int32 millimetres), and drives the other
+player's puppet itself (spawn from the area-safe template → EffectResurrection →
+ActionMoveToLocation to 1 m beside the remote player; JumpToLocation when > 15 m). Local
+object slot 192 holds the puppet. `je.netStatus`, `je.netPause` (test mutation). With a
+127.x peer the socket binds 127.0.0.1 only (no firewall prompt).
+
+Observed, in order:
+1. First v0.6 started scripts from the first armed frame: both copies closed ~2 s after
+   start (log stopped right after "net on"). Changed to run nothing until `je.netStart`.
+2. Armed on A only: A closed right after the breadcrumb "net: first player eval". Cause
+   not identified. The C NCS builder output was compared byte for byte with the Python
+   builder (identical).
+3. Added a vectored exception logger (first 5 access violations, with stage), and a
+   guard to run scripts only when the VM is idle (depth −1 at vm+0x0C). Next run: no
+   crash; the guard never triggered (`vmBusySkips` 0), so it does not explain step 2.
+   The logger later recorded one access violation per copy at eip 0x00487327 reading
+   address 0x8, stage `jbn_pcok`, in the run the owner closed (likely during shutdown,
+   unconfirmed).
+4. Packets flowed both ways and each game spawned the other's puppet, but the received
+   y was −1 mm in both directions while x and z were right; `jbn_p1` evaluated through
+   the bridge was correct (30459). The puppet was therefore spawned at y ≈ 0. Rebuilt
+   with an int wire format, values kept in memory, frame pointers: still y = −1.
+5. Next run, **the same binary** (`4070cc8a…`, confirmed by hashing the file staged from
+   the PC) sent y correctly. The y = −1 bug is therefore **intermittent and unexplained**.
+   The guess "several scripts in one frame" is not confirmed. A one-script-per-frame
+   rewrite (`1973dcd2…`) was built but not deployed: the file-commit tool wrote a cached
+   earlier file for the reused staging path. Lesson: give every build a unique staging
+   file name.
+
+`crossnet.py` (binary `4070cc8a…`, both copies loaded the same save, same area):
+```
+== real
+PASS net on, sending, receiving (A and B) / B and A each spawned the other's puppet
+PASS leg 1-4  A moved 6.0 m each leg; B's puppet moved 5.85-5.91 m, 2.62-2.67 s, gap 0.91-1.09 m
+PASS B's own player untouched
+SUMMARY: 9/9 passed
+== mutation (je.netPause on B)
+FAIL legs 1-4 (puppet moved 0.0 m); PASS the 5 checks that do not depend on B's sync
+SUMMARY: 5/9 passed
+```
+A first run of the test failed legs 1 and 3 because it measured the puppet's start
+position after A's teleport; the DLL reacts within ~100 ms, faster than the bridge read.
+The test now measures before the teleport.
+
+Open: the intermittent y = −1; test the one-script-per-frame build; Steam relay for
+friends on other PCs; facing and animations; enemies and combat.
