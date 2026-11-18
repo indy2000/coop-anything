@@ -311,3 +311,35 @@ Derived: the bridge can now read and change game state live through the game's o
 1,058 script functions with no restart, which is the basis for bots and for the co-op
 sync layer. Still missing: mutation twins for these checks; a script compiler (only
 hand-assembled probes so far).
+
+### First bot actions (2026-11-18, jebridge v0.3 + client `ncs.py` / `bot.py`)
+All scripts are hand-assembled NCS sent with `je.loadScript` (no restarts). Routine numbers
+from the game's `nwscript.nss`. Patterns used:
+- run as a creature: `ExecuteScript(oTarget, sScript)` (#8, JE argument order: object
+  first); the executed script uses OBJECT_SELF = CONSTO 0.
+- remember objects across scripts: `SetLocalObject(GetPlayer(), 190, o)` /
+  `GetLocalObject(GetPlayer(), 190)` (#58/#54; JE locals are numbered). Slot numbers
+  190/191 chosen by us; collision with game use unknown.
+- location: `Location(GetArea(x), [fx, fy, fz], facing)` (#215/#24); vector = 3 CONSTF
+  with z pushed last.
+
+Observed:
+| Action | Result |
+|---|---|
+| `JumpToLocation` on the player (#313) | teleported exactly (0.00 m error) |
+| `ActionMoveToLocation` / `ActionMoveToObject` / `ActionForceMoveToLocation` on the player | ignored while the player has control (outside cutscenes) |
+| `CreateObject(2, "j00h_abbot0", loc)` (#243) | creature spawned at the requested point, `GetIsObjectValid` = 1 |
+| `ActionJumpToLocation` on the spawned creature (#214) | executed via its action queue (0.00 m error) |
+| `ActionMoveToLocation` on a level NPC and on the spawned creature, game window focused | walked 3 m, stopped 0.15 m from target in ~1.5–2 s |
+| same, game window **not** focused | accepted, but nothing moves |
+| `DestroyObject(o, 0.0)` (#241) on the spawned creature | still valid afterwards (focused and unfocused). Cause unknown. |
+| `GetNearestObject(GetPlayer(), 2, n)` (#227) | 0-based; index 0 was our spawned creature |
+
+Derived:
+- **The game freezes world simulation (movement, deferred actions) while its window is
+  unfocused**, even though the main loop keeps running and app+0x3C (paused) stays 0.
+  Unattended bots and two copies on one PC need this disabled: find the focus flag
+  (WM_ACTIVATE / WM_ACTIVATEAPP handling) and keep it "active" in the DLL. Next task.
+- The remote player's puppet in co-op will be an ordinary creature (spawned, driven by
+  action queues), which works. The local player is moved by its own input; bots for the
+  local player need input injection or cutscene mode (to research).
