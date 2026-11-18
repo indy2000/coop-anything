@@ -234,7 +234,16 @@ Bug found and fixed: these requests had been written while an earlier copy was s
 the Steam error; the next process picked them up and ran them during start-up. v0.1 now
 deletes request files left over from an earlier run when it starts.
 
-Open problem: about 5 s after that ping the copy stopped answering even transport-thread
-requests and the DLL file was no longer locked, so the process had ended. Cause unknown
-(crash vs. closed; owner asked). Candidates: missing/partial `sound` files despite
-NoSound=1, the hook, or something unrelated.
+The run ending ~5 s after that ping was the owner closing the copy (confirmed), not a crash.
+
+### jebridge v0.1 check run (pid 9164, 2026-11-18, file transport from the agent VM)
+On start the DLL dropped the 8 leftover request files (log: "dropped stale request files
+from an earlier run"). `checks.py` (11 checks):
+```
+PASS ping ready / version build / state on main thread / runScript noop rc=1 /
+     runScript missing rc=0 / runScript no resref -32602 / unknown method -32601 /
+     debug flag on / debug flag read back / 20x runScript (2.59 s) / frames advance after tests
+SUMMARY: 11/11 passed
+```
+These checks have no mutation twins yet (playbook/in-game-bridge.md §6): to do before
+calling the bridge tested.
