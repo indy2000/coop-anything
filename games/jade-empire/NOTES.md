@@ -490,3 +490,10 @@ relay runs outside the game.
 
 Next: move the relay into the DLL (game-to-game over UDP, then Steam relay for friends),
 puppet facing/animations, and the hard part — host authority for enemies and combat.
+
+### Mod code repository
+Our code now lives in https://github.com/indy2000/jade-empire-coop (MIT; no game files):
+`dll/` (jebridge, reproducible build with `/Brepro`: three builds, two folders, same
+SHA-256 `ebab8eee…46b593c7` for the v0.5 source), `tools/ncsasm.py`, `client/` tests.
+Note: the v0.5 DLL deployed in the test installs (`6412d829…`) was built before `/Brepro`,
+so its hash differs from the repo build of the same source.
