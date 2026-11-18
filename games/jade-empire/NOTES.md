@@ -618,3 +618,13 @@ committed (`8203645…`) counts a send as an error only when the send call itsel
 Open: smoke test with real Steam on one copy (does `SteamAPI_Init` work for AppID 480 in this
 game, is a lobby created); real two-account test between two PCs (confirms offset 12);
 join through the friends list; facing/animations; combat; story; area transitions.
+
+Smoke test with real Steam (one copy, owner's account, DLL `8203645…`, real `steam_api.dll`
+`fdafb7c6…`, `steam_appid.txt` = 480, game started normally through its own launcher):
+```
+je.netStart → within 3 s: steam on, own SteamID read, lobby created (lobbyState 2),
+lobby id written to bridge\lobby.txt; no peer yet → sent 0, sendErr 0 for 24 s; game kept running
+```
+So `SteamAPI_InitFlat`, the callback dispatch and `CreateLobby` work inside Jade Empire next
+to its legacy `steam.dll` check. Still unverified with real Steam: join, session accept,
+messages and the sender offset (needs a second account on another PC).
