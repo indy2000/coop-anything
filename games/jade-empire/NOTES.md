@@ -374,3 +374,51 @@ script that uses it.
 
 Test copy state: 2–3 test abbots are left standing in the test copy's prologue (not
 saved; gone on reload).
+
+## Session 2 (2026-11-18 afternoon)
+Start-of-session check: fork up to date; repo search (API, `is:issue`/`is:pull-request`
+"jade") shows only our claim #407 (no comments) and two closed TMNT PRs (Ubisoft Jade
+engine, unrelated).
+
+### Spawned creatures: why they didn't walk, and how to remove them
+Observed (`nwscript.nss` comments):
+- `DestroyObject` (#241): "This will only deactivate creatures, placeables, doors and
+  triggers". So `GetIsObjectValid` = 1 after it is expected.
+- `CreateObject` (#243) documents projectiles, placeables and stores; creatures are not
+  listed. JE toggles pre-placed creatures with `SetObjectActive` (#756, 6 args:
+  object, bActive, spawnAnim, despawnAnim, crust, durationMs) / `GetObjectActive` (#755).
+
+Observed (owner's game, test copy, `bridge\keep_active` marker on):
+- A spawned `j00h_abbot0` is born **dead**: `GetIsDead` 1, `GetHealth` 0, `GetMaxHealth`
+  10000, `GetObjectActive` 1. `SetObjectActive(TRUE)` and `SetHealth(100)` (#156) do not
+  clear "dead". Dead creatures ignore move actions. Level NPCs: dead 0, health 25,
+  AI level 2 (our spawn: AI level 3).
+- Spawning a template whose model the current area has not loaded triggers an engine
+  assert and closes the game: "Exo Assert … ccreatureappearance.cpp line 354 …
+  CCreatureAppearance::CreateBodyAppearance(): Model not found N_Bandit_" (template
+  `j02c_banditc` in the prologue area). The client now only spawns templates from an
+  allowlist verified per area (`ncs.SAFE_TEMPLATES`, currently `j00h_abbot0` for the
+  prologue).
+- `restest.py`, same creature, one change at a time:
+```
+PASS fresh spawn is dead (known)            {"dead": 1, "hp": 0, "active": 1}
+PASS dead spawn does not walk (control)     {"moved": 0.0, "toTarget": 3.0}
+PASS alive after resurrection               {"dead": 0, "hp": 10000, "active": 1}
+PASS walks after resurrection               {"moved": 2.86, "toTarget": 0.15}
+PASS walks again                            {"moved": 2.36, "toTarget": 0.14}
+PASS deactivated                            {"dead": 0, "hp": 10000, "active": 0}
+PASS game still running
+SUMMARY: 7/7 passed
+```
+  Resurrection = `ApplyEffectToObject(o, DURATION_TYPE_INSTANT=0, EffectResurrection(0), 0.0)`
+  (#220, #82).
+- Earlier "walking depends on place" idea was wrong: a spawn next to a walking level NPC
+  also failed while dead.
+
+Derived: puppet lifecycle for the remote player = CreateObject (area-safe template) →
+EffectResurrection → action-queue moves → SetObjectActive(FALSE) to remove. The
+"dead spawn does not walk" control doubles as the mutation twin for the walk check.
+
+Corrects session 1: the second abbot "walked" and the third did not; with every spawn
+born dead, which creature was measured in session 1 is uncertain (slot 190 was
+overwritten by each spawn). Treat session-1 spawned-creature results as unreliable.
