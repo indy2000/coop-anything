@@ -579,3 +579,42 @@ crossnet.py regression on 0.6.3              10/10
 Limit: the block is synthetic. `stucktest.py` tried the points where the puppet got stuck
 in the failed run, but from the open start they are reachable even on 0.6.1 (3/3), so a
 physical block has not been reproduced on demand yet.
+
+### v0.7.0: Steam (Spacewar, AppID 480) transport, tested with a mock
+Download (approved by the owner): Steamworks.NET Standalone 2025.164.1, 32-bit
+`steam_api.dll` from the release zip, SHA-256
+`fdafb7c65ec7d4182b42bf92cc8671c68e4dc547cc6e613899d2618a47eb65da`
+([releases](https://github.com/rlabrecque/Steamworks.NET/releases)). Not committed anywhere;
+the player puts it next to the exe of the test copy.
+
+Design (`dll/steamnet.inc` in [indy2000/jade-empire-coop](https://github.com/indy2000/jade-empire-coop),
+commit `73a883c`), following [networking-steam-spacewar.md](../../playbook/networking-steam-spacewar.md):
+- Flat C API through `LoadLibrary`/`GetProcAddress`, manual callback dispatch, all on the
+  game's main thread, started on the first tick after `je.netStart`.
+- Host: `CreateLobby(friends only, 2)`, lobby data `jecoop=1`, rich presence `connect`,
+  lobby id written to `bridge\lobby.txt`. Joiner: `JoinLobby(<id from net.txt>)`.
+- Callbacks used: 703 (call result), 513 LobbyCreated, 504 LobbyEnter, 1251 session request.
+  The host accepts only lobby members, the joiner only the lobby owner.
+- Same 24-byte packet as UDP; `SendMessageToUser` unreliable + no Nagle, channel 0.
+- Sender identity read at offset 12 of `SteamNetworkingMessage_t` on 32-bit, fallback 16;
+  the DLL counts which one matched (`senderAt12` / `senderAt16` in `je.netStatus`).
+- 64-bit id ↔ decimal without the CRT helpers (`__aulldiv`/`__allmul`).
+
+Mock (`mock/steam_api_mock.c`): a fake `steam_api.dll` exporting the same flat functions,
+two copies on one PC talk UDP on 127.0.0.1; config `steam_mock.txt`. It raises 1251 once per
+stranger until accepted, like real Steam. **It only proves our side of the API contract;
+the offsets and callback layouts are what we believe real Steam uses — unverified.**
+
+Results on the owner's PC, two test copies, same save, mock build `2e59229e…`, DLL `9554a6ee…`:
+```
+status: both in lobby 109775240917155841 (state 2), host accepted 1 rejected 0,
+        senderAt12 46/42, senderAt16 0
+crossnet.py (steam)              SUMMARY: 13/13 passed   puppet moved 5.8-5.9 m, gap 0.9-1.2 m, ~2.6 s
+crossnet.py --mutate-pause (B)   SUMMARY: 9/13 passed    all 4 movement legs FAIL (moved 0.0 m)
+```
+Seen: the host counts `sendErr 6` from sends before the session was accepted. 0.7.0 as
+committed (`8203645…`) counts a send as an error only when the send call itself failed.
+
+Open: smoke test with real Steam on one copy (does `SteamAPI_Init` work for AppID 480 in this
+game, is a lobby created); real two-account test between two PCs (confirms offset 12);
+join through the friends list; facing/animations; combat; story; area transitions.
