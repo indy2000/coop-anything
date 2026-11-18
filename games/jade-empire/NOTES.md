@@ -422,3 +422,24 @@ EffectResurrection → action-queue moves → SetObjectActive(FALSE) to remove. 
 Corrects session 1: the second abbot "walked" and the third did not; with every spawn
 born dead, which creature was measured in session 1 is uncertain (slot 190 was
 overwritten by each spawn). Treat session-1 spawned-creature results as unreliable.
+
+### Follow test: the remote-player avatar in one game (automated, no human input)
+`followtest.py`: spawn → resurrect a puppet next to the player; teleport the player
+(`JumpToLocation`) around a 6 m square (4 legs); after each jump the client polls the
+puppet at 4 Hz and orders `ActionMoveToLocation` to a point 1 m beside the player (run if
+> 4 m away) until it is within 1.6 m (limit 8 s). Each leg also requires the puppet to
+have moved > 2 m (added after the first mutation run showed leg 4 could pass with a
+puppet that never moved, because the path ends where it spawned).
+```
+== real
+PASS leg 1  moved 3.58 m, 1.93 s, gap 1.06 m, 1 order
+PASS leg 2  moved 5.93 m, 3.24 s, gap 1.19 m, 1 order
+PASS leg 3  moved 6.20 m, 3.22 s, gap 1.48 m, 1 order
+PASS leg 4  moved 5.96 m, 2.65 s, gap 1.07 m, 1 order
+SUMMARY: 4/4 passed
+== mutation (no resurrection)
+FAIL legs 1-4  moved 0.0 m
+SUMMARY: 0/4 passed
+```
+Observed: `JumpToLocation` on the player lands up to ~1 m from the requested point
+(probably snapped to the walkmesh); the test reads the actual position after the jump.
