@@ -547,3 +547,35 @@ The test now measures before the teleport.
 
 Open: the intermittent y = −1; test the one-script-per-frame build; Steam relay for
 friends on other PCs; facing and animations; enemies and combat.
+
+### v0.6.1–0.6.3: y = −1 investigation, isolated tests, stuck puppets
+Deployment check: since the cached-file mishap, every build is staged under a unique name
+and the file on the PC is hashed after deployment (0.6.1 `7dcf223e…`, 0.6.2 `0230acb1…`,
+0.6.3 `0612f388…`; each matches the reproducible repo build of its commit).
+
+y = −1:
+- `je.evalMany` (0.6.1) runs several scripts back to back in one main-thread call.
+  `yinvest.py`: 7 orderings/combinations of the position scripts × 10 runs on both copies
+  all returned correct values. **Refuted:** "several scripts in one frame" causes it.
+- With 0.6.1 armed: sent = actual position in every sample, both players at the same
+  spot, after teleports to different spots, and while the owner walked A by hand (45
+  samples, 0 with y ≈ 0). **Not reproduced since; cause unknown.**
+
+Test isolation: one `crossnet.py` run failed 5/9 after the owner had walked A near the
+fences: the test started from A's current position, the puppet partly got stuck, and
+the following mutation run "passed" legs because the puppet was still finishing earlier
+orders. The test now teleports A to the open start point of the save and waits for the
+puppet to settle before measuring or pausing. 0.6.1: real 10/10, mutation all legs FAIL.
+
+Stuck puppets (0.6.3): > 3 m from the remote player and < 0.3 m progress in 2 s → jump
+beside the player; the jump script also calls `SetCommandable(TRUE, OBJECT_SELF)` (#162).
+`blockedtest.py` makes B's puppet non-commandable (a synthetic block: walk orders refused):
+```
+0.6.1 (no rule)                              0/2  gap 5.9-6.9 m after 9 s
+0.6.2 (rule, jump without SetCommandable)    0/2  stuckJumps 4 and 8, the jump was refused too
+0.6.3                                        2/2  one jump each, ~2 s, gap 1.0 m
+crossnet.py regression on 0.6.3              10/10
+```
+Limit: the block is synthetic. `stucktest.py` tried the points where the puppet got stuck
+in the failed run, but from the open start they are reachable even on 0.6.1 (3/3), so a
+physical block has not been reproduced on demand yet.
