@@ -188,3 +188,53 @@ Unknown:
 
 Toolchain available in the agent workspace: clang 18 + lld-link + llvm-dlltool can build
 a freestanding 32-bit Windows DLL (no install needed on the owner's PC).
+
+## 2b. Test install and first in-game bridge (2026-11-18)
+Test install (rule 2): `%USERPROFILE%\Downloads\JadeEmpireCoop\test_install`, a copy of the
+install without `movies/` (4.3 GB) and `sound/` (1.2 GB; a few sound files from an
+aborted first copy are present). File list and `chitin.key` / exe hashes match the
+original. The copy's `JadeEmpire.ini` (original kept as `JadeEmpire.ini.orig`):
+ScrW=1280, ScrH=720, Windowed=1, NoMovies=1, NoSound=1, NoLogos=1.
+
+Observed:
+- Started directly (not from Steam), the copy shows "Failed to find Steam." Fix: copy
+  Steam's own `steam.dll` from the Steam folder into the copy (the owner did it). The
+  ownership check still runs against the Steam client. After that the copy reached the
+  main loop.
+- The copy does not need the original's admin/compat flags to start.
+
+### jebridge v0 (proxy `xinput9_1_0.dll`)
+Code: freestanding C (no CRT), clang 18 `--target=i686-pc-windows-msvc` + lld-link,
+16 KB. The game's own `xinput9_1_0.dll` (SHA-256 `9c14c5af…bd0e0cf6`) is renamed
+`xinput_orig.dll` in the test copy; the proxy forwards XInputGetState/SetState/
+GetCapabilities to it in code (lld-link mangled forwarder exports on x86 to
+`_xinput_orig.*`, so `.def` forwarders were not used).
+- Main-thread pump: IAT hook of `PeekMessageA` in the IAT range 0x006E1000–0x006E1350,
+  pumping only on the first thread that calls it (frame counter = distinct GetTickCount
+  values).
+- Protocol: coop-anything bridge v1 subset — `ping`, `version`, `methods` on the transport
+  thread; `je.state`, `je.setDebugPanel`, `je.runScript {resref, oid}` on the main thread.
+- Transports: TCP 127.0.0.1:47310.. (endpoint file `coopbridge.json`) and a **file
+  transport** (`bridge\in\*.json` → `bridge\out\*.json`), added because the agent's shell
+  runs in a VM that cannot reach the owner's loopback, and the bridge must not listen on
+  the LAN.
+- Test script `jebr_noop.ncs` (`void main(){}`: header `NCS V1.0` `B` + size, `JSR +8`,
+  `RETN`, `RETN`; header and entry stub checked against the game's own
+  `override\j00_a_chest_1.ncs`).
+
+Results (pid 4648, the run after steam.dll was added):
+- `je.state` → `app 0x02850048, paused 0, vm 0x062F10A0, debugPanelFlag 0`, thread ==
+  main thread (31324).
+- `je.runScript {"resref":"jebr_noop"}` → `rc 1` (script found and run) on the main thread.
+- `je.runScript {"resref":"jebr_doesnotexist"}` → `rc 0`.
+- unknown method → -32601; missing `resref` → -32602.
+- `ping` → frames 429, mainLoopAgeMs 16, ready true.
+
+Bug found and fixed: these requests had been written while an earlier copy was stuck at
+the Steam error; the next process picked them up and ran them during start-up. v0.1 now
+deletes request files left over from an earlier run when it starts.
+
+Open problem: about 5 s after that ping the copy stopped answering even transport-thread
+requests and the DLL file was no longer locked, so the process had ended. Cause unknown
+(crash vs. closed; owner asked). Candidates: missing/partial `sound` files despite
+NoSound=1, the hook, or something unrelated.
