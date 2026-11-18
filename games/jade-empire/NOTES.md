@@ -335,11 +335,42 @@ Observed:
 | `DestroyObject(o, 0.0)` (#241) on the spawned creature | still valid afterwards (focused and unfocused). Cause unknown. |
 | `GetNearestObject(GetPlayer(), 2, n)` (#227) | 0-based; index 0 was our spawned creature |
 
-Derived:
-- **The game freezes world simulation (movement, deferred actions) while its window is
-  unfocused**, even though the main loop keeps running and app+0x3C (paused) stays 0.
-  Unattended bots and two copies on one PC need this disabled: find the focus flag
-  (WM_ACTIVATE / WM_ACTIVATEAPP handling) and keep it "active" in the DLL. Next task.
+Derived (CORRECTED below — the focus explanation was confounded, see "Focus and pause"):
+- ~~The game freezes world simulation while its window is unfocused~~: the before/after
+  test changed two things at once (window focus and which NPC was nearest).
 - The remote player's puppet in co-op will be an ordinary creature (spawned, driven by
   action queues), which works. The local player is moved by its own input; bots for the
   local player need input injection or cutscene mode (to research).
+
+### Focus and pause (jebridge v0.4, 2026-11-18)
+Observed (Ghidra): window procedure 0x005D9320 (registered via 0x005D9640 from
+0x004A3B21). On `WM_ACTIVATE` (6) it writes `0x0075ECDC` = 0 (inactive, logs
+"aurlite.cpp NULL #1!!!") or 1 (active, "aurlite.cpp SET #1!!!"). ~20 functions read that
+flag, including `CGameObject::GetPosition` 0x00434430 and the app update 0x004A3A40.
+
+jebridge v0.4 (`xinput9_1_0.dll` SHA-256 `dd281b5d…34647ab6`) adds `je.keepActive {value}`
+(writes 1 to 0x0075ECDC every frame while on), a startup marker `bridge\keep_active`, and
+`appActive`/`keepActive` in `je.state`.
+
+Observed (owner's game unfocused, pid 39188):
+- `je.state` while unfocused: `appActive 0`, `paused 1` (app+0x3C).
+- `je.keepActive 1` → within 0.5 s `appActive 1`, `paused 0`. After `je.keepActive 0`
+  the flag stays 1 until the next WM_ACTIVATE (event-driven).
+- `focustest.py` 5/6: FAIL "unfocused, keepActive off: NPC does not walk" — a level NPC
+  walked 2.85 m with the game unfocused and keepActive off (expected not to). PASS the
+  rest (keepActive on/off, NPC walks with keepActive on, game still running).
+- A third spawned abbot (spawned at player + (2, −1, 0), ended at z 23.28 vs player
+  23.84) did not walk and was not destroyed, both with `paused 1` and after keepActive
+  made `paused 0`. The second abbot (player + (2, +1, 0)) had walked.
+
+Derived: an inactive window makes the game pause itself (app+0x3C), and keepActive
+undoes that. That alone does not explain the walking failures.
+
+Guesses (unverified): spawn points off the walkmesh stop pathing; `DestroyObject`
+(#241) needs a different call (signature or a JE-specific flag). Next: spawn at
+`GetLocation(GetPlayer())` + an offset found by `GetNearestObjectToLocation`/walkmesh
+query, a controlled A/B with one creature, and check `DestroyObject` against a game
+script that uses it.
+
+Test copy state: 2–3 test abbots are left standing in the test copy's prologue (not
+saved; gone on reload).
