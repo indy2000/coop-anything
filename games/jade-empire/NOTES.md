@@ -278,3 +278,36 @@ Observed:
 
 Next: serve bridge scripts from memory instead of `override\` (hook the resource
 lookup) so probes can change without restarting the game.
+
+### In-memory scripts, no restarts (jebridge v0.3, 2026-11-18)
+Observed (Ghidra on the dump):
+- `RunScript` 0x00697840 loads code with `0x00695600` = `thiscall(vm, CExoString *resref)`
+  (0 = ok, -0x5E = too deep (depth > 7), -0x5F/-0x60 = not found/bad file). It asks the
+  VM's resource loader (vm+0x3CC, vtable +4 demand, +0x18 release) for the NCS, checks
+  `NCS V1.0B`, then copies the code after the 13-byte header into script slot
+  `vm + 0x10 + depth*0x28` with `0x00694800` = `thiscall(vm, slot, code, len)` and executes
+  with `0x00697360`. Depth counter at vm+0x0C. Slots are freed by `0x00695B20`.
+- `0x00695600` has exactly three callers (E8 rel32): 0x00697872 (RunScript),
+  0x0069583C, 0x006974DE.
+
+Built: jebridge v0.3 (`xinput9_1_0.dll` SHA-256 `09e3ea9f…2eda5d53`) re-targets those three
+call sites to a replacement that serves names registered with
+`je.loadScript {name, hex}` (whole NCS file, ≤16-char name) from the DLL's memory and
+passes every other name to the original loader. It checks each site is `E8 → 0x00695600`
+before patching.
+
+Check run (pid 21732, owner controlling the character in a new game), `memtest.py`:
+```
+PASS server 0.3 / load jm_pcok, jm_const, jm_px, jm_maxhp, jm_py, jm_pz, jm_hp (names not in override)
+PASS mem const = 4242 / mem hp > 0 (120) / mem position (-60.257, 26.44, 23.839)
+PASS hot replace -> 7 (same name, new bytes, no restart)
+PASS bad hex rejected / unknown mem name -> not run / override path still works / game still running
+SUMMARY: 16/16 passed
+```
+Position tracking while the owner walked for 16 s (1 Hz): positions changed while moving,
+held while standing, 14.04 m travelled in the xy plane.
+
+Derived: the bridge can now read and change game state live through the game's own
+1,058 script functions with no restart, which is the basis for bots and for the co-op
+sync layer. Still missing: mutation twins for these checks; a script compiler (only
+hand-assembled probes so far).
