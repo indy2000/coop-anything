@@ -247,3 +247,34 @@ SUMMARY: 11/11 passed
 ```
 These checks have no mutation twins yet (playbook/in-game-bridge.md §6): to do before
 calling the bridge tested.
+
+### Script function table, return values, first state reads (2026-11-18)
+Observed:
+- The game ships `override\nwscript.nss` (engine function declarations, 1,058 functions)
+  and 143 `.nss` sources + 100 `.ndb` debug files in `override\`. Routine number =
+  declaration order; early numbers match NWN/KotOR (PrintString #1, AssignCommand #6,
+  ExecuteScript #8, FloatToInt #231). Useful ones: GetPlayer #548, GetHealth #49,
+  GetMaxHealth #50, GetPosition #27, GetArea #24, GetIsObjectValid #42,
+  GetGlobalBoolean #776 / SetGlobalBoolean #777, CreateObject #243, JumpToLocation #313.
+- BioWare left cut multiplayer routines in the table with a `ZZ_CUT_` prefix:
+  `ZZ_CUT_GetNextPC` #549, `ZZ_CUT_AddToParty` #572, `ZZ_CUT_RemoveFromParty` #573,
+  `ZZ_CUT_SendMessageToPC` #374, `ZZ_CUT_GetPCPlayerName` #371,
+  `ZZ_CUT_GetLastPlayerDying` #410, `ZZ_CUT_GetModuleName` #561. Whether the engine
+  still implements them: unknown.
+- No `debugpanel` GUI ships in `override\` (58 other .gui files do). With the flag at
+  0x006F28A0 set to 1 (confirmed by read-back), pressing K in game did nothing (owner
+  test). Panel not pursued further.
+- Return values: `0x006948C0` = `thiscall(vm, int *type, int *value)` → bool (call site
+  0x0044E740); type 3 = int. Exposed as `je.evalScript {resref}` in jebridge v0.2.
+- `override\` is indexed at game start: scripts added while running are not found
+  (rc 0). Overwriting an already-indexed script while running did not change its
+  behaviour either (probably cached after first run; unverified).
+- Hand-assembled probes (`ncsasm.py`; pattern `RSADDI; JSR 8; RETN; …; CPDOWNSP -8,4;
+  MOVSP -4; RETN` matches the game's own `j04_c_gold_14b.ncs`). Results on the owner's
+  new game (pid 40804): `jebr_const` → 4242, `GetIsObjectValid(GetPlayer())` → 1,
+  `GetHealth(GetPlayer())` → 120, `GetMaxHealth` → 120. The position probe first used
+  the wrong opcode for MUL (0x10 = LEQ; MUL is 0x16) and returned rc 0 without harming
+  the game; fixed version not yet verified (needs a restart).
+
+Next: serve bridge scripts from memory instead of `override\` (hook the resource
+lookup) so probes can change without restarting the game.
