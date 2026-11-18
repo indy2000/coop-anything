@@ -158,3 +158,33 @@ Derived:
 Unknown:
 - Which input opens it (case 6 of the handler's event switch), what executes `command`,
   and what `debug.ini` controls (loaded at init 0x0040AC40 into a stack-local reader).
+
+### Debug panel is a shell; script runner found (2026-11-18)
+Observed:
+- In the panel's select handler (0x00525CD0, disassembly 0x00525D47–0x00525E71) the
+  `command` string is read into a stack-local CExoString, the `t/f` toggle is applied,
+  and the string is then destroyed. No call consumes it; the panel closes and the game
+  unpauses. The command executor appears compiled out of the retail build.
+- Owner reports (from community reading, unverified here) that **K** opens the debug
+  menu. The code only shows it as event index 6 of the action loop in 0x00448FC0;
+  key mapping not traced.
+- Script runner: `0x00697840` is called as `thiscall(vm, CExoString *resref,
+  uint32 oidSelf, int 1)`, returning 0 on failure (then "Problem running script" via
+  OutputDebugStringA, 0x0044E610) — same shape as NWN/KotOR
+  `CVirtualMachine::RunScript`. `vm = *(*(int*)0x0076C924 + 0x9C)` (app object global
+  0x0076C924). Return value read with `0x006948C0` (type 3 = int).
+  Second caller: campaign script loader 0x00425780 (`ccampaign.cpp`, "Bad script").
+- App object global `0x0076C924`: +0x3C paused flag, +0x9C script VM, +0xB4 GUI manager.
+
+Derived:
+- The bridge for bots should call `RunScript` directly with our own compiled `.ncs`
+  scripts (from a test-install `override/`), instead of relying on the debug panel.
+
+Unknown:
+- An NWScript compiler that targets Jade Empire's function table (nwscript.nss for JE),
+  or whether to hand-assemble `.ncs`. To research.
+- Whether a copy of the install outside Steam's folder still passes the steam.dll
+  check (needed for the isolated test install, rule 2). Install size: 6.9 GB.
+
+Toolchain available in the agent workspace: clang 18 + lld-link + llvm-dlltool can build
+a freestanding 32-bit Windows DLL (no install needed on the owner's PC).
