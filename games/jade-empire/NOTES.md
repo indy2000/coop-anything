@@ -131,3 +131,30 @@ Unknown:
 - Which keys the game reads from `debug.ini`, and how/if the debug panel can be opened in
   the retail build. Next target: callers of the INI getter on the debug.ini object, and
   callers/constructor sites of the panel @ 0x005262F0.
+
+### Developer debug panel (2026-11-18, Ghidra on the Scylla dump)
+Observed:
+- Panel class ctor @ 0x005262F0 (0xA30 bytes, created by 0x00448870, stored at
+  `app->guiManager(+0xB4)->+0x78`). It parses an INI-style menu file
+  `OVERRIDE4:debugpanel` with the engine's own text-INI reader (0x0065BE80 load,
+  0x0065C7D0 count, 0x0065C650 enumerate sections, 0x0065C5B0 get value). Each section's
+  `file` key names a sub-menu file (`OVERRIDE4:%s`), loaded by 0x00525E90.
+- On selection (handlers 0x00525B10 / 0x00525CD0) it reads the item's `command` key; a
+  `t/f` token is replaced with ` 1` or ` 0` (toggle items), then the panel closes and the
+  game unpauses (0x0040BE70 = set-paused on the app object, flag at app+0x3C).
+- It is opened from the in-game input handler 0x00448FC0 (switch case 6 @ 0x0044A3CC)
+  only if `DAT_006F28A0 != 0`, global @ 0x0076C58C != 1, and game-state flag 0x3D is
+  clear. `DAT_006F28A0` is 0 in .data and has **no writes** anywhere (one read only):
+  the menu is compiled off in the retail build.
+- `OVERRIDE4:` resource root and the `debugpanel` GUI layout are not shipped (unknown
+  whether the GUI resource exists in the game's data; to check with a resource lister).
+
+Derived:
+- A DLL can set `0x006F28A0 = 1` at runtime to re-enable the panel, and supply its own
+  `debugpanel` menu files. Where the `command` string goes after selection is not traced
+  yet — if it reaches a script/console executor, this is a ready-made command channel for
+  the in-game bridge and bots.
+
+Unknown:
+- Which input opens it (case 6 of the handler's event switch), what executes `command`,
+  and what `debug.ini` controls (loaded at init 0x0040AC40 into a stack-local reader).
