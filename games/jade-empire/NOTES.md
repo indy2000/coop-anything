@@ -443,3 +443,50 @@ SUMMARY: 0/4 passed
 ```
 Observed: `JumpToLocation` on the player lands up to ~1 m from the requested point
 (probably snapped to the walkmesh); the test reads the actual position after the jump.
+
+### Two game instances on one PC (jebridge v0.5)
+Observed (Ghidra):
+- Single-instance guard in 0x004A3A40: `OpenMutexA(…, "JadeEmpire")` (push at
+  0x004A3A6B); if it does not exist, `CreateMutexA(…, "JadeEmpire")` (push at 0x004A3A9A)
+  and the game initialises; otherwise it skips initialisation. The same string
+  (0x006EC73C) is also passed to 0x00598030 from 0x004A53B0 (app name), so the string
+  itself is not changed.
+- 0x004A53B0 also calls `FindWindowA("JadeEmpPC", "Jade Empire")` and exits if found, but
+  the game registers its window class as "JadeDirect3D" (0x005D9640), so this check
+  never matches the game's own window.
+
+Built: jebridge v0.5 (`xinput9_1_0.dll` SHA-256 `6412d829…41d86bda3`): with the marker
+`bridge\multi_instance`, `DllMain` re-points both mutex pushes to a per-process name
+(`JadeEmpire_jeb_<pid>`) after checking they are `68 3C C7 6E 00`. DllMain runs while the
+PECompact stub resolves imports, after it has unpacked `.text`, so the patch lands before
+WinMain.
+
+Second isolated test install: `%USERPROFILE%\Downloads\JadeEmpireCoop\test_install_b`,
+copied from `test_install` (5,434 files, file lists match, exe SHA-256 unchanged), with its
+own `bridge\` (keep_active + multi_instance). The bridge's TCP endpoint moves to the next
+free port (A 47310, B 47311). The file transport is per install folder.
+
+Observed: both copies started at once (pids 9008 and 24656), both logged
+"multi_instance: single-instance mutex made per-process", both had a valid player in the
+same area at the same position.
+
+`crossfollow.py`: the relay (agent client) reads A's player position at 4 Hz and drives a
+resurrected puppet in B; A's player is teleported around a 6 m square.
+```
+== real
+PASS leg 1  moved 3.96 m, 3.23 s, gap 1.03 m, 1 order
+PASS leg 2  moved 4.81 m, 3.27 s, gap 0.95 m, 1 order
+PASS leg 3  moved 5.09 m, 2.27 s, gap 1.52 m, 1 order
+PASS leg 4  moved 5.84 m, 3.18 s, gap 0.95 m, 1 order
+PASS B's own player untouched
+SUMMARY: 5/5 passed
+== mutation (relay off)
+FAIL legs 1-4 (moved 0.0 m); PASS B's own player untouched
+SUMMARY: 1/5 passed
+```
+Derived: the core of "remote player shown as a puppet" works between two real game
+processes. The transport is still the agent's file relay over a VM, not networking; the
+relay runs outside the game.
+
+Next: move the relay into the DLL (game-to-game over UDP, then Steam relay for friends),
+puppet facing/animations, and the hard part — host authority for enemies and combat.
