@@ -628,3 +628,14 @@ lobby id written to bridge\lobby.txt; no peer yet → sent 0, sendErr 0 for 24 s
 So `SteamAPI_InitFlat`, the callback dispatch and `CreateLobby` work inside Jade Empire next
 to its legacy `steam.dll` check. Still unverified with real Steam: join, session accept,
 messages and the sender offset (needs a second account on another PC).
+
+### v0.7.1: Ctrl+Shift+N arming and a player package
+Players without the bridge client arm net with Ctrl+Shift+N (game window focused); one beep.
+Package `JadeEmpireCoop-0.7.1.zip` (scripts in `package/` of the mod repo): `instalar.bat` finds
+the game through the Steam registry key and `libraryfolders.vdf`, checks the exe hash, robocopies
+the install to `%USERPROFILE%\JadeEmpireCoop\jogo` (original untouched), swaps in the proxy DLL,
+copies `Steam.dll` and the pinned `steam_api.dll`, writes `steam_appid.txt`; `hospedar.bat` /
+`entrar.bat` (asks for the lobby code) / `mostrar-codigo.bat` / `desinstalar.bat`.
+Owner ran install + host on his PC: hashes in the copy match, log shows
+`armed by Ctrl+Shift+N` → `steam up` → `lobby created`, and `mostrar-codigo.bat` showed the code.
+Next: friend joins from another PC (first real two-account test).
