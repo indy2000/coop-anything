@@ -654,3 +654,35 @@ over 35 s: host sent ~13 pkt/s, received ~4.4 pkt/s; the friend walked ~5 m
 Observed, cause unknown: the friend's send rate is about a third of the host's (guess: lower
 frame rate on his PC, since one script runs per frame; or his window unfocused).
 Not yet checked: what the friend's side shows (no access to his logs).
+
+### v0.7.2: the puppet trailed a running player by seconds
+Reported in the first friend session: "when he walks, it takes a while to walk in my game".
+Measured with `client/lagtest.py` (mock Steam, two copies on one PC, A "runs" a 6 m square at
+4.5 m/s by short teleports because the player ignores scripted move actions; `je.netTune`
+switches B between behaviours in the same session):
+```
+                                   mean delay after A stops   mean max gap   teleports
+0.7.1 behaviour (tune 3)           2.39 s                      5.8 m          2
+0.7.2 without queue clearing (4)   1.88 s                      6.1 m          2
+0.7.2 (tune 0)                     0.70 s                      3.3 m          0
+crossnet.py regression on 0.7.2    13/13
+```
+Causes found, each confirmed by a probe:
+- `ActionMoveToLocation` is **queued**: every new order went behind the old ones, so the
+  puppet walked each stale waypoint in turn. Fix: `ClearAllActions` (#9) first. A probe with
+  clear + a new order every 0.3 s still covered 7-8 m in 2 s (one order: ~9 m), so re-ordering
+  itself costs little.
+- The puppet walked (1.5 m/s) until 4 m behind; it runs at 5.3 m/s (jog 3.1 m/s, measured).
+  Now it runs when the remote player's smoothed speed is > 2 m/s or it is > 2.5 m behind, with
+  hysteresis (a flickering speed estimate made it restart its order).
+- Position read one script per frame (7 frames per cycle, ~230 ms at 30 fps). Now player x,y,z
+  in one frame, puppet x,y,z in the next. The earlier "several scripts per frame" fear had been
+  refuted in 0.6.1; crossnet stays 13/13.
+- Aims 0.5 s ahead along the remote velocity (max 3 m).
+Test pitfall: A cannot reach x+8 from the start (it stops at about x+6); the test first used
+the commanded end point and reported false delays. It now uses where A really stopped.
+The 0.6 s goal set before the run was missed (0.70 s); the test's own sampling is ~0.3 s.
+
+Bug found on the way: `je.netStatus` with the Steam block is ~700 bytes, the reply buffer was
+512 (stack overflow in the bridge thread whenever the agent asked for status, since 0.7.0).
+Now 2048. Players never call it.
