@@ -639,3 +639,18 @@ copies `Steam.dll` and the pinned `steam_api.dll`, writes `steam_appid.txt`; `ho
 Owner ran install + host on his PC: hashes in the copy match, log shows
 `armed by Ctrl+Shift+N` → `steam up` → `lobby created`, and `mostrar-codigo.bat` showed the code.
 Next: friend joins from another PC (first real two-account test).
+
+### First real two-account test (owner + a friend on another PC, 0.7.1, real Steam)
+Host log (owner's copy): `lobby created` → `peer <friend id>` → `first packet received` →
+`first puppet spawn attempt` → `first puppet drive`. `je.netStatus` on the host:
+```
+lobbyState 2, peer = friend, sendErr 0, bad 0, puppet alive, spawns 1
+senderAt12 59, senderAt16 0      -> sender identity at offset 12 CONFIRMED on real 32-bit Steam
+accepted 0                       -> the host never got a session request: it messaged the
+                                    friend first, so the friend accepted the owner instead
+over 35 s: host sent ~13 pkt/s, received ~4.4 pkt/s; the friend walked ~5 m
+(remote y 32.3 -> 37.7 m), the host's puppet got 10 move orders, 0 jumps, 0 stuck jumps
+```
+Observed, cause unknown: the friend's send rate is about a third of the host's (guess: lower
+frame rate on his PC, since one script runs per frame; or his window unfocused).
+Not yet checked: what the friend's side shows (no access to his logs).
