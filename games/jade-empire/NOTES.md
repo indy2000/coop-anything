@@ -733,3 +733,22 @@ run 5.15-5.58 m/s with EffectMovementSpeedIncrease(15/60) (#165), EffectMovement
 slowing). Guess (unverified): run speed comes from the animation (root motion). Open: a puppet
 template that runs as fast as the player, or the player's own speed source.
 Package: `JadeEmpireCoop-0.7.4.zip`.
+
+### Friend session on 0.7.4 and the next design (planned, not built)
+Owner: walking "looks well synchronized", running still loses sync (speed limit above), and the
+puppet always walks forwards: walking backwards shows a forward walk on the other side (no
+facing in the packet yet).
+Owner's proposal: let player 2 control the active companion instead of a spawned puppet, like
+the Dragon Age: Origins co-op mod (dao-coop, see `games/dragon-age-origins/README.md`). Different
+engine (Eclipse, not Odyssey), so no code reuse; the architecture carries over:
+join by host save transfer (same world, same object ids), each player drives one party member
+with its AI off, each game mirrors the other's creature, host-authoritative combat requests.
+Jade Empire API that fits (routine numbers by declaration order in `nwscript.nss`): henchman
+system (`GetSelectedHenchman` 326, `ActivateHenchman` 309, `SetHenchmanCombatMode`,
+`SetHenchmanFollowPlayerInCombat`), `PolymorphPlayerToHenchman`, `SetHenchmanAppearance`,
+`GetFacing` 28 / `SetFacing` 10, `CombatMoveCreature` 1010 (DIRECTION_BACKWARD/LEFT/RIGHT,
+"only works if the AI is disabled"), `SetAILevel` 286.
+Guess to test: in the guest's game, polymorph the guest's player into the companion and give the
+companion the host's appearance, so both players see the same two characters.
+Experiments planned once the owner has a save with an active companion: companion run speed,
+obedience with AI off, CombatMoveCreature backwards/strafe, SetFacing, the two appearance calls.
