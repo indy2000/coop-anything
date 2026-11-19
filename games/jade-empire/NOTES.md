@@ -707,3 +707,29 @@ log ended with `AV at 0x00487327 ... stage jbn_pcok/jbn_p1` (the "shutdown AV" n
 there. The DLL now calls the same lookup first and idles (`noPlayerSkips`) while it is null.
 Owner checked on 0.7.3: Quit game returns to the main menu, no CRASH line in the log.
 Package: `JadeEmpireCoop-0.7.3.zip`.
+
+### v0.7.4: live session analysis, stuck rule, speed limit
+Live status from the owner's copy during a friend session on 0.7.3 (90 s):
+```
+packets       ~16.7/s each way, lastRecvAgo < 80 ms, bad 0, busy skips 0
+friend speed  walk ~1.5 m/s, run ~5.8 m/s (remoteSpeedMms); gait orders follow it
+stuck jumps   9 in 90 s, all while the friend ran
+```
+Owner: "delay seems below 1 s but still there; switches walk/run as he does" (Ctrl toggles
+walk/run in this game).
+Cause of the jumps: the player runs 5.8 m/s, the puppet (j00h_abbot0) 5.3 m/s; in a long run the
+gap grows, the "distance not shrinking for 2 s" rule fired although the puppet was running.
+0.7.4: the puppet must also have stopped (< 0.5 m own movement in 2 s).
+```
+sprinttest.py (A laps the 6 m square at 7 m/s, 10 s per run, stuck jumps)
+  0.7.4 rule        0, 1     (target was 0: not met)
+  0.7.3 rule        4, 3 / 2, 3
+blockedtest.py      2/2  (a puppet that cannot walk is still jumped next to A)
+crossnet 13/13, gaittest 4/4
+```
+Tried and failed: making the puppet faster. `speedprobe.py` (net paused, clean orders) measured
+run 5.15-5.58 m/s with EffectMovementSpeedIncrease(15/60) (#165), EffectMovementSpeedDecrease(50)
+(#451) and EffectSlowed(50/150) (#780), permanent and temporary: **no effect at all** (even
+slowing). Guess (unverified): run speed comes from the animation (root motion). Open: a puppet
+template that runs as fast as the player, or the player's own speed source.
+Package: `JadeEmpireCoop-0.7.4.zip`.
