@@ -806,3 +806,32 @@ Friend session on 0.8.0 (same save, both the same protagonist, appearance 3 / he
 the friend walks sideways (strafe), the puppet turns and walks straight. Needs (1) the player's real
 orientation and (2) a way to play strafe/back-walk animations while moving (nMoveAnim slid with the
 idle pose; CombatMoveCreature did nothing out of combat).
+
+### v0.8.1: the player's real facing (RE), and a bridge overflow
+Method: NWScript handler table. The table init writes each handler as `mov [ecx+N*4], handler`
+(GetPlayer 548 -> +0x890 = 0x00487310), so GetFacing (28, +0x70) = 0x00483670. It reads the vector
+returned by FUN_00412410 (vfunc 0x74 + 0x10) of the object found by id. RE helpers `je.playerPtr`
+and `je.peek` then read the player creature (FUN_00424700 on app+0xA0): +0x50 holds a unit vector,
++0x5C the position. Snapshots of creature+0..0x800 while the owner turned: the vector at +0x50 went
+128.2 -> 33.3 -> -127.2 deg (copies at +0x758 and +0x764); the last step's direction from the
+positions was -127 deg. GetFacing(GetPlayer()) stayed 119.4 all the time (why: unknown).
+0.8.1 sends cos/sin*10000 from +0x50 (JEC2 bytes 24-27) and turns the standing puppet with
+SetFacingPoint (#143) to a point 2 m along that direction.
+Two crashes on the way, both mine: a 512-byte `je.peek` crashed copy A twice. Not the read: the
+bridge's `reply()` built the reply in `char buf[700]`; 1,050 chars smashed the bridge thread's
+stack. `je.netStatus` with the Steam block (~950 chars) had overflowed the same buffer since 0.7.0
+without a visible crash. Now 2,200 bytes, body cut to fit. Reads are checked with VirtualQuery.
+Results:
+```
+looktest.py (test hook je.testSetDir turns A by writing +0x50; scripts cannot turn the player)
+  0.8.1 first build     5/5; the owner's live turns: puppet often left at another angle
+  + after-a-walk cases  6/8 on that build (puppet 49 deg instead of 300, 11 instead of 45): it took
+                        a new walk order right after being turned (run->walk change, small target shift)
+  fix (no walk order while the remote stands within 2 m; turn whenever both stand)   8/8, again 8/8
+  mutation (tune 32 on B)  2/4
+gaittest.py 4/4 (owner's save)
+live, owner turning in copy A (25 s): every sample with A standing >= 2 s within 7 deg of A;
+  bigger differences only for < 1 s around steps
+```
+Still open: walking sideways/backwards is shown as a forward walk (owner's report on 0.8.0).
+Package `JadeEmpireCoop-0.8.1.zip`.
