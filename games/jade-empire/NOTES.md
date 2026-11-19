@@ -801,3 +801,8 @@ player controller updates).
 Also: in-memory script table 32 -> 128 entries ("script table full" after many probes).
 Package `JadeEmpireCoop-0.8.0.zip`. Known risk: the puppet template `j00h_abbot0` has been spawned
 in two areas only (Two Rivers, the owner's Dawn Star save); other areas are untested.
+Friend session on 0.8.0 (same save, both the same protagonist, appearance 3 / head -1): owner says
+"the appearance is correct" and "overall it is progressing". Still open, by owner's report: when
+the friend walks sideways (strafe), the puppet turns and walks straight. Needs (1) the player's real
+orientation and (2) a way to play strafe/back-walk animations while moving (nMoveAnim slid with the
+idle pose; CombatMoveCreature did nothing out of combat).
