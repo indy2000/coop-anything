@@ -838,3 +838,27 @@ Package `JadeEmpireCoop-0.8.1.zip`.
 Friend session on 0.8.1 (owner + friend, real Steam): owner: "the facing works well now and the
 running sync improved a lot; it needs refining and the other points". Host status over 60 s: 16.7
 pkt/s, bad 0, remote direction followed his turns, 7 standing turns applied, 1 jump.
+
+### Strafe / backwards walking: RE so far (branch `re/strafe` of the mod repo, not released)
+Observations:
+- Player creature (vtable 0x006F2D48): **+0x52C = movement animation** while the owner moved with
+  the keyboard: standing 0, forward 0, sideways left 20 (ANIMATION_WALKL), right 24 (WALKR),
+  backwards 16 (WALKB) (`movesnap.py`: 50 snapshots, phases derived from velocity vs facing).
+  The owner: his own character does not turn when walking sideways/backwards; only the animation
+  changes.
+- The puppet (j00h_abbot0) is another class (vtable 0x006F03D8), found by scanning private RW
+  memory for a unit vector at +0x50 and the script position at +0x5C (`je.findCreature`). Same
+  field +0x52C there: walk 0, run 4, turning in place 38/39, standing 8. Methods of that class
+  (vtable+0x4C -> FUN_004C7AC0, +0xB0 -> FUN_004C7680) touch +0x52C; FUN_004C7680 resets it to -1.
+- Script objects cannot be returned to the bridge: GetRunScriptReturnValue gives no value for an
+  object, even copied into an int return slot.
+Tried and failed (owner watched):
+- Forcing +0x52C (20/16) and holding +0x50 every frame from the start of ActionMoveToLocation: the
+  puppet only rotates, does not walk (moved 0.09 m / 0 m).
+- Same, starting the force 0.5 s after the walk started: it stops (0.94 m / 0.14 m); owner saw it
+  turn and walk forwards first.
+- Moving it ourselves (writing +0x5C/+0x60 every frame) with the anim/dir forced: no movement at
+  all (script position unchanged, owner: "stood still") -> the engine keeps the real position
+  elsewhere and overwrites these fields.
+Next (offline RE, no game needed): find the player input path that writes 16/20/24 into +0x52C
+and the function that then moves the player; call it (or its movement step) for the puppet.
