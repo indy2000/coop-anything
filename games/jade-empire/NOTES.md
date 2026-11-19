@@ -779,3 +779,25 @@ player's is -1), faces like the remote player when standing; resurrect with TRUE
 companion while co-op is on. Backwards/strafe walking: open (try CombatMoveCreature in combat).
 Pitfall: the DLL's in-memory script table (MS_MAX) fills up after many differently named probe
 scripts: reuse names in probes.
+
+### v0.8.0: puppet looks like the remote player; works after Two Rivers
+Packet JEC2 (32 bytes): JEC1 fields + facing (int centidegrees, GetFacing*100) + appearance (int16)
++ head type (int16). Appearance/head are read every 40 sends.
+Puppet: `SetAppearance(puppet, app, head)`, head -1 sent as 0. Resurrection now TRUE.
+Results on the owner's later save (two test copies, mock Steam):
+```
+looktest.py         2/2   B's remoteApp 3 / head -1 = A's; puppet app 3, head 0, appSets 1
+crossnet.py         11/13 failures: setup "puppet settled" gap 2.24 m, leg 1 moved 1.45 m;
+                          A stops after 4.7 m of a 6 m leg here and Dawn Star stands beside A:
+                          the test geometry was made for the open square in Two Rivers
+gaittest.py         3/4   round 1 walk phase 4 walk / 4 run (puppet started > 4 m behind after
+                          the previous test and ran to catch up)
+```
+Facing does not work yet: `GetFacing(GetPlayer())` returned 119.4 in 32 samples over 20 s while the
+owner walked in all directions (position changed), and `SetFacing` on the player does not turn
+it. 0.8.0 first applied that value to the standing puppet (it snapped to 119.4); now off unless
+`je.netTune 64`. Open: find the player's real orientation (RE: GetFacing handler vs the field the
+player controller updates).
+Also: in-memory script table 32 -> 128 entries ("script table full" after many probes).
+Package `JadeEmpireCoop-0.8.0.zip`. Known risk: the puppet template `j00h_abbot0` has been spawned
+in two areas only (Two Rivers, the owner's Dawn Star save); other areas are untested.
