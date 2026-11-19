@@ -686,3 +686,24 @@ The 0.6 s goal set before the run was missed (0.70 s); the test's own sampling i
 Bug found on the way: `je.netStatus` with the Steam block is ~700 bytes, the reply buffer was
 512 (stack overflow in the bridge thread whenever the agent asked for status, since 0.7.0).
 Now 2048. Players never call it.
+
+### v0.7.3: walk vs run, and "Quit game" crash
+Friend session on 0.7.2 (owner's report): delay "reduced a bit"; the puppet always ran, even
+when the friend walked. Cause: 0.7.2 only switched back to walking below 1 m/s (walk is 1.5 m/s).
+Now: walk below ~2.3 m/s, run above (hysteresis 2.0/2.6 m/s), run to catch up when > 4 m behind
+(3 m to stop). The speed comes from the remote positions over the last ~0.5 s (ring buffer);
+a 150 ms smoothed estimate flickered with bunched packets and raised lagtest's delay to 1.29 s.
+```
+gaittest.py (A walks 5 m at 1.5 m/s, runs 5 m at 4.5 m/s, orders counted while A moves)
+  0.7.3                 4/4    e.g. walk phase walk 6 / run 0, run phase walk 0 / run 4
+  mutation: 0.7.2 rule  2/4    walk phases: run 8-12 / walk 1-2  (reproduces the report)
+lagtest.py 1 round      mean delay 0.73 s (0.7.1 behaviour 0.97 s this run; n = 4 legs, noisy)
+crossnet.py             13/13
+```
+"Quit game" (Esc) closed the game instead of returning to the main menu, and every session's
+log ended with `AV at 0x00487327 ... stage jbn_pcok/jbn_p1` (the "shutdown AV" noted earlier).
+0x00487310 is NWScript GetPlayer: `app+0xA0 -> FUN_00424700` (thiscall lookup), then reads
+`[result+8]` with no null check; once the player is unloaded, our per-frame scripts crashed
+there. The DLL now calls the same lookup first and idles (`noPlayerSkips`) while it is null.
+Owner checked on 0.7.3: Quit game returns to the main menu, no CRASH line in the log.
+Package: `JadeEmpireCoop-0.7.3.zip`.
