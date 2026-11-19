@@ -752,3 +752,30 @@ Guess to test: in the guest's game, polymorph the guest's player into the compan
 companion the host's appearance, so both players see the same two characters.
 Experiments planned once the owner has a save with an active companion: companion run speed,
 obedience with AI off, CombatMoveCreature backwards/strafe, SetFacing, the two appearance calls.
+
+### Companion and appearance experiments (owner's save with Dawn Star, copy A, 0.7.4)
+All by bridge scripts; owner confirmed the visual results on screen.
+Observations:
+- `GetSelectedHenchman` (326) = 4 (HENCHMAN_DSTAR); she is `GetNearestObject(player, CREATURE, 0)`
+  (nNth is 0-based), appearance 12, AI level 3.
+- `SetAILevel(0)` does not stop her following the player (moved 5.7 m after the player jumped 6 m).
+- `ActionMoveToLocation` on her (ExecuteScript, ClearAllActions, commandable 1): ignored, current
+  action stays 0. `CombatMoveCreature` (1010) forward/backward/left/vPos: ignored. JumpToLocation
+  works. -> **the engine drives companions; scripts cannot walk them.** Not like dao-coop.
+- `SetAppearance` (118) on an NPC and on our puppet works (owner: "an NPC got my character's
+  model"). Player: appearance 3, head -1 (built-in). With head -1 the puppet kept the abbot's head;
+  **head 0 gives the player's own head** (owner: identical). Run speed does not change with the
+  appearance (NPC ~5 m/s with 144, 12 and 3) -> the player's 5.8 m/s comes from elsewhere (unknown).
+- `j00h_abbot0` spawns in this area too (no model assert). Spawned creatures are dead (GetIsDead 1,
+  hp 0); **EffectResurrection(FALSE) does not revive them here, EffectResurrection(TRUE) does**
+  (hp 10000). The DLL uses FALSE (worked in Two Rivers) -> must switch to TRUE.
+- Moving the puppet: normal move 2.9 m ok. `nMoveAnim` 16 (WALKB): no movement at all. 69
+  (BACK_PEDDLE), 17, 18, 22, 26: it moves but the owner saw **no walk animation (idle pose
+  sliding)**. `EnableOrientationChanges(FALSE)` (164) keeps the facing while moving (slides).
+  `CombatMoveCreature` on the puppet (AI 0, out of combat): no movement.
+- `SetFacing` (10) works on the puppet.
+Derived plan (0.8): send appearance/head/facing; puppet copies the appearance (head 0 when the
+player's is -1), faces like the remote player when standing; resurrect with TRUE; stash the real
+companion while co-op is on. Backwards/strafe walking: open (try CombatMoveCreature in combat).
+Pitfall: the DLL's in-memory script table (MS_MAX) fills up after many differently named probe
+scripts: reuse names in probes.
