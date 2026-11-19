@@ -835,3 +835,6 @@ live, owner turning in copy A (25 s): every sample with A standing >= 2 s within
 ```
 Still open: walking sideways/backwards is shown as a forward walk (owner's report on 0.8.0).
 Package `JadeEmpireCoop-0.8.1.zip`.
+Friend session on 0.8.1 (owner + friend, real Steam): owner: "the facing works well now and the
+running sync improved a lot; it needs refining and the other points". Host status over 60 s: 16.7
+pkt/s, bad 0, remote direction followed his turns, 7 standing turns applied, 1 jump.
