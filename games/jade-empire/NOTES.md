@@ -862,3 +862,28 @@ Tried and failed (owner watched):
   elsewhere and overwrites these fields.
 Next (offline RE, no game needed): find the player input path that writes 16/20/24 into +0x52C
 and the function that then moves the player; call it (or its movement step) for the puppet.
+
+### v0.9.0: the guest joins from the host's save
+Owner chose this before strafing (strafe likely comes with combat: CombatMoveCreature needs combat).
+Facts checked first (copy A, owner's Dawn Star save):
+- No NWScript call loads a game; `DoAutoSave` (#514) saves at once: a new folder
+  `Save\Auto <n> - <time> - level <l>` with `save.sac` (~200 KB) and `SaveImage.tga` (1 MB)
+  appeared within a second.
+- The Load menu lists any folder under `Save\`: copies named `Save 99 - ...` and
+  `Co-op - 0h 5min - level 1` were listed (owner checked).
+Design (`dll/savexfer.inc`, Steam channel 1, reliable): guest `JEQS` every 2 s -> host DoAutoSave,
+waits for the new Auto* folder, sends `JESH` (sizes, CRC32) + `JESD` 8 KB chunks (4 per tick,
+retried on a send error) -> guest checks sizes and CRC32, writes `Save\Co-op - host\`, beeps twice.
+The guest can arm at the main menu (Steam and the transfer run before the "no player" check).
+The mock steam_api now keeps one queue per channel and carries up to 60000 bytes.
+```
+savetest.py (B asks, A sends; SHA-256 of B's files vs A's fresh autosave)
+  B in game                3/3   201,300 + 1,048,594 bytes, 3 requests, 0 errors
+  B at the main menu       3/3   (Auto 101), B armed at the menu
+  mutation (A not armed)   0/3   B asked 23 times, nothing arrived
+owner loaded "Co-op - host" in B:  first time 1.41 m from A (loaded before the A autosave it got? A
+  had moved its puppet there), second time 0.00 m; both puppets alive, appearance applied
+looktest 8/8, gaittest 4/4 after the change
+```
+Not yet tested over real Steam between two PCs (send buffer limits, relay speed).
+Package `JadeEmpireCoop-0.9.0.zip`: entrar.bat writes `getsave 1`; the guest arms at the menu.
