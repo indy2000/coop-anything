@@ -915,3 +915,25 @@ B through the door     both 780201015: both spawns 2, puppet alive 1 m from the 
                        (owner: "the other player's character appeared in both copies")
 ```
 Package `JadeEmpireCoop-0.9.1.zip`. Not yet tested over real Steam.
+
+### Combat: first facts (two copies, owner's Dawn Star save, the fight after the door)
+Probes `nearenemies.py` / `combatprobe.py` (client, device VM). Observations:
+- The fight starts with a cutscene after the door in both copies independently (each copy runs its
+  own fight). Dawn Star killed several enemies on her own in both copies.
+- `SetDisableCombatAI(TRUE)` (#930) set before the fight did NOT stop Dawn Star fighting (the
+  engine drives companions); unknown yet whether it froze the enemies.
+- `GetIsInCombat()` (#320) = 1 during the fight. `GetCurrentCombatArea(player, i, 1)` (#939) gave
+  nothing at first; with nActiveOnly 0 a combat area with 8 (A) / 9 (B) participants was valid
+  (index 0 and 1/2).
+- `GetIsEnemy(player, x)` (#235) returned 50 for every creature, Dawn Star included: useless as a
+  flag (a reputation value?).
+- Tag hash (same NCS as the area hash) + position identify creatures across the two games:
+  idle creatures had the same tag hash and the same position to the centimetre in A and B
+  (e.g. app 33 at (30.18, -20.73) tag 446588709; app 81 at (31.31, -20.44) tag 446588678).
+  Several creatures share one tag (four app 147 with tag -1927315377), so identity = tag + where
+  it stood when the fight started. Fighters move, so their positions differed between A and B.
+- Health: `GetHealth` (#49) / `GetMaxHealth` (#50); dead creatures read hp 0, `GetIsDead` 1.
+Derived plan (not built): host owns all fighters. Guest: on fight start freeze its own fight
+(enemies' AI off, its Dawn Star out of the fight or stashed), match fighters to the host's by tag
+hash + start position, then mirror position/health/death from the host; guest hits on an enemy
+become damage requests the host applies (EffectDamage) and mirrors back.
