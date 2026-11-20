@@ -894,3 +894,24 @@ sentFiles 2 (200,702 + 1,048,594 bytes), 184 send retries (Steam's send buffer f
 that tick's chunks), 6 guest requests (some arrived while the host was saving/sending), 1 position
 send error, puppet alive, bad 0. Idea to cut the wait: the 1 MB SaveImage.tga is 84 % of the bytes
 (send a smaller picture, or the save first).
+
+### v0.9.1: area changes
+Owner's report from a friend session on 0.9.0: after both went through a door "the session broke
+in both games and we stopped seeing each other". Positions are per area and the mod did not know
+the area.
+Area id: scripts cannot return strings, so the NCS computes a hash of
+`GetStringLowerCase(GetTag(GetArea(GetPlayer())))` over 16 chars: h = h*31 + FindSubString(ALPHA,
+GetSubString(tag, i, 1)) + 2 (#61, #65, #66, #168, #24; ADDII 0x14 0x20, MULII 0x16 0x20). Owner's
+Dawn Star save: before the door tag length 8 -> -1473994964, after it 9 -> 780201015, stable over
+repeated reads. Packet JEC3 (36 bytes) adds it. Read every 20 sends and after a load; the player
+was not unloaded at this door (noPlayerSkips stayed 0).
+Bug found: the DLL's NCS builder buffer was 512 bytes and cut longer scripts silently (the area
+script is ~1.2 KB, it returned nothing, myArea stayed 0). Now 4096, overflow refused and logged.
+Door test (two copies, mock Steam, owner walked):
+```
+both before the door   myArea = remoteArea = -1473994964, puppets alive (spawns 1)
+A through the door     A 780201015 / B -1473994964: both areaHides 1, puppet none
+B through the door     both 780201015: both spawns 2, puppet alive 1 m from the other player
+                       (owner: "the other player's character appeared in both copies")
+```
+Package `JadeEmpireCoop-0.9.1.zip`. Not yet tested over real Steam.
