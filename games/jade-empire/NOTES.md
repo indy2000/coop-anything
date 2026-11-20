@@ -888,3 +888,9 @@ looktest 8/8, gaittest 4/4 after the change
 ```
 Not yet tested over real Steam between two PCs (send buffer limits, relay speed).
 Package `JadeEmpireCoop-0.9.0.zip`: entrar.bat writes `getsave 1`; the guest arms at the menu.
+Real two-PC test of 0.9.0 (owner host, friend guest, real Steam): owner: "it took a few seconds to
+give the two beeps, but it imported the save into his game and it worked". Host status after it:
+sentFiles 2 (200,702 + 1,048,594 bytes), 184 send retries (Steam's send buffer full; each one ends
+that tick's chunks), 6 guest requests (some arrived while the host was saving/sending), 1 position
+send error, puppet alive, bad 0. Idea to cut the wait: the 1 MB SaveImage.tga is 84 % of the bytes
+(send a smaller picture, or the save first).
