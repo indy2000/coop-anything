@@ -881,8 +881,9 @@ savetest.py (B asks, A sends; SHA-256 of B's files vs A's fresh autosave)
   B in game                3/3   201,300 + 1,048,594 bytes, 3 requests, 0 errors
   B at the main menu       3/3   (Auto 101), B armed at the menu
   mutation (A not armed)   0/3   B asked 23 times, nothing arrived
-owner loaded "Co-op - host" in B:  first time 1.41 m from A (loaded before the A autosave it got? A
-  had moved its puppet there), second time 0.00 m; both puppets alive, appearance applied
+owner loaded "Co-op - host" in B:  first time 1.41 m from A (exactly -1 m on x and y; cause
+  unknown, guess: the engine moved the player off an object on load), second time 0.00 m;
+  both puppets alive, appearance applied
 looktest 8/8, gaittest 4/4 after the change
 ```
 Not yet tested over real Steam between two PCs (send buffer limits, relay speed).
