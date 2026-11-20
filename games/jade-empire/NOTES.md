@@ -937,3 +937,26 @@ Derived plan (not built): host owns all fighters. Guest: on fight start freeze i
 (enemies' AI off, its Dawn Star out of the fight or stashed), match fighters to the host's by tag
 hash + start position, then mirror position/health/death from the host; guest hits on an enemy
 become damage requests the host applies (EffectDamage) and mirrors back.
+
+### Combat sync v1: work in progress (branch `wip/combat` of the mod repo, not released)
+More facts (owner's save, two copies):
+- Pulling the companion out: `SetHenchmanFollowPlayerInCombat(GetSelectedHenchman(), TRUE)` (#1045,
+  #326) works: owner saw Dawn Star move but not attack.
+- Freezing enemies: the global `SetDisableCombatAI(TRUE)` before the fight did not (the enemies
+  killed the player); `SetDisableCreatureCombatAI(o, TRUE)` on every participant right after the
+  fight started did (positions and health unchanged over 3 s). `SetMinimumHealth(player, 1)` (#716)
+  keeps a test player alive.
+- Enemies = `GetStandardFaction` 1 (here); player 0, Dawn Star 7, bystanders/objects 5, our puppet -1.
+- `SetHealth` (#156) sets health; `EffectDeath` (#927) kills (owner saw it fall); the player's hits
+  lower a frozen enemy's health (owner killed one).
+- **The cutscene replaces the enemies**: the creatures listed when the fight starts are gone right
+  after it (invalid), the real fighters are new objects with the same tag hash.
+- `GetCurrentCombatArea` + `GetCombatAreaParticipantByIndex` in one script returned an invalid
+  object; storing the area in a local object first and then asking for the participant works.
+- `GetIsObjectValid` read 0 for a live enemy (faction 1, hp 25) on the guest: not usable alone.
+- An NWScript object equality (EQUALOO 0x0B 0x22) of two invalid objects is 1.
+Open bug in the v1 code: on the host the in-fight flag and its enemy table are reset about every
+500 ms ("fight started (host)" 167 times in one fight, "fight over" once; the compiled store is
+correct, so either the flag is overwritten or log lines are lost: logline opens the file with share
+mode READ only, a reader can make it drop lines). Next: canary + change log for the flag, a log
+that does not drop lines, then rerun `client/fighttest.py`.
