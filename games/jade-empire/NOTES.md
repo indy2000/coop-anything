@@ -994,3 +994,5 @@ and only if under 1.5 s old.
 QA (mock steam, two local copies): fighttest 6/6, then the same 6/6 after reloading the save in
 both copies. New checks: "B kills enemy: it dies in A", "no enemy dead on B while A's is alive".
 Not shown: that the reload check fails on 0.10.0 (not rerun with the old build).
+Real two-PC test of 0.10.1 (owner + friend, real Steam): owner: deaths sync precisely, and stay in
+sync after reloading the save (both cases that failed on 0.10.0).
