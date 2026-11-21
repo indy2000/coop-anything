@@ -1049,3 +1049,33 @@ Observed in the decompile (addresses are build 1510):
 Next: find who sets an enemy's target to the player (callers of `FUN_0046ff70` from AI code,
 `FUN_004ccb70` first), then try pointing one enemy's target struct at the puppet's id from the DLL
 and see whether it attacks it.
+- Observed with a hardware write watch on an enemy's `+0x58c` (DR0, main thread) while the DLL wrote
+  the puppet's id there every frame: the AI rewrites it every frame. Writers: `0x470b5b`
+  (`FUN_004709c0` resets it to invalid when it differs from the wanted target) and `0x47008a`
+  (`FUN_0046ff70`, setting the player), called from `FUN_00470470` (`0x4708b1`). Without our writes
+  nothing wrote it for 8 s. Invalid object id here = `*(0x0075b394)` = `0xffffffff`.
+- `FUN_00470470` (target chooser, ecx = target struct): if struct+0x18 (creature `+0x5a4`, "wanted")
+  is set and `FUN_004bc760(enemy, wanted)` passes, the wanted object becomes the target; else it
+  scans combat-area participants (`FUN_00470420` relation 2 = hostile, `FUN_0046fcc0`), else player.
+- `FUN_004bc760(a, b)` = can a attack b: both `vtbl+0x94` true, both `+0x588` (in combat) set, and
+  relation `FUN_0046f3a0(a+0x58c, b)` == 2. Relation from faction reputation (`FUN_00455f40`):
+  100 -> 3 friend, 50 -> 4 neutral, else 2 hostile; `b+0x594` set -> 5.
+- Called in the game from the DLL (`je.call`, test copies): for the puppet everything passed except
+  the relation, 4 (neutral), even after `ChangeFaction(puppet, player)`. After
+  `ChangeToStandardFaction(puppet, 2 /* FRIENDLY1 */)` (or 4) it was 2 and canAttack 1. Pinning the
+  puppet's id into enemy 1's `+0x5a4` then made it target and hit the puppet (puppet health
+  10000 -> 9888 in 10 s; owner: "each enemy is focusing on one player, hits work").
+- `SetHealth` on the guest's player changed what `GetHealth` reads but not the health bar, and the
+  player did not die at 0 (owner). `ApplyEffectToObject(INSTANT, EffectDamageHealth(n) /* #771 */,
+  player)` moves the bar (owner). Enemy health bars on the guest do follow `SetHealth` (owner).
+### 0.11.0-re6 (branch `re/target`): host enemies fight the puppet
+- Host: puppet gets FRIENDLY1, AI off, minimum health 1. Every second each enemy is given the nearer
+  player (3 m hysteresis; with 2+ enemies at least one each); every frame the DLL writes the
+  puppet's id into `+0x5a4` of the puppet's enemies (clears it for the others and at fight end).
+  The puppet's health loss is sent to the guest ('JEPH', channel 1) and the puppet refilled.
+- Guest: applies `EffectDamageHealth(lost)` to its player.
+- QA (mock steam, two local copies): fighttest 8/8 (new: "A: the enemies split between A's player
+  and B's puppet" onPuppet [1]; "B's player loses health when A's enemy hits B's puppet", 3 hits,
+  66 damage, B 100 -> 78). Owner: B's health bar went down, enemy bars on B went down until death.
+- Known: on the guest the enemies stay frozen copies, so nobody is seen attacking B. Next: replicate
+  the host enemies' attack moves (PlayCombatAnimation #940 = `0x48ff20`, style-specific move index).
