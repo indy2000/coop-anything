@@ -1023,3 +1023,29 @@ stopped on a status reply missing its combat block (test tool now retries; seen 
 Test prep also takes the companion out of the world (`DeactivateHenchman(GetSelectedHenchman())`,
 #311) on both copies, at the owner's request: she sometimes killed the enemies in A.
 Not yet: attack animations of that enemy on the host; not tested over real Steam.
+Real two-PC test of 0.11.0 (owner + friend): the target switch works, but it plays badly: on the
+host the handed-over enemy only follows the guest, no combat animation; when it goes back to the
+host its health refills (cause not looked at). Owner's call: keep it on branch `exp/split-ownership`
+of the mod repo (main reverted to 0.10.1), and reverse engineer the enemy's target choice instead.
+
+### RE: how an enemy picks its target (started; build 1510, Ghidra headless on the unpacked dump)
+Observed in the decompile (addresses are build 1510):
+- NWScript handler table: written by `FUN_004a0e50` as `movl $handler, N*4(%reg)`; 623 of ~1060
+  routines mapped so far. LockCombatTarget (#37) = `0x48ee50`, SetDisableCombatAI (#930) =
+  `0x47f160`, SetDisableCreatureCombatAI (#935) = `0x47f1b0`, AddCombatAreaParticipant (#875) =
+  `0x49ab80`, GetCombatTeam (#767) = `0x482510`, GetLastHostileAttacker (#1038) = `0x491020`.
+- #935 -> `FUN_004b80a0(creature, flag)`: creature `+0x660` = combat AI off; `+0x588` is non-null
+  in combat. `FUN_0046f0e0`: AI counts as off if `+0x65c` or `+0x660` is set.
+- A creature's combat target is a small struct: dword target id, short kind (1 = object target,
+  2 = second kind, unknown), `[10]` = owning creature. Get: `FUN_0046f240` (kind 1) /
+  `FUN_0046f370` (kind 2); set: `FUN_0046ff70(this, id, flag)`. Callers of the setter include
+  `FUN_00451bf0`, `FUN_004ccb70`, `FUN_0044c4a0`, `FUN_00433690`.
+- The player's own target picker is `FUN_00434b90` (Ghidra auto-named it CGameObject::GetPosition,
+  wrong): it walks the player's combat areas, collects up to 30 participants ("Too many targets in
+  area"), picks one with `FUN_00433710`, sets it with `FUN_0046ff70`.
+- Per-creature combat tick `FUN_004cd9c0` (vtable slot at `0x006f03e4`) calls `FUN_004709c0` and
+  `FUN_004cd3a0`. `FUN_004709c0` compares the creature's targets with the player's id
+  (`FUN_00424700()+8`) in several places: first candidate for "enemies only fight the player".
+Next: find who sets an enemy's target to the player (callers of `FUN_0046ff70` from AI code,
+`FUN_004ccb70` first), then try pointing one enemy's target struct at the puppet's id from the DLL
+and see whether it attacks it.
