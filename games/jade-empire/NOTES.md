@@ -960,3 +960,5 @@ Open bug in the v1 code: on the host the in-fight flag and its enemy table are r
 correct, so either the flag is overwritten or log lines are lost: logline opens the file with share
 mode READ only, a reader can make it drop lines). Next: canary + change log for the flag, a log
 that does not drop lines, then rerun `client/fighttest.py`.
+Real two-PC test of 0.9.1 (owner + friend, real Steam): owner: "the scene transition after the
+door worked".
