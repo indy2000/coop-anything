@@ -1079,3 +1079,24 @@ and see whether it attacks it.
   66 damage, B 100 -> 78). Owner: B's health bar went down, enemy bars on B went down until death.
 - Known: on the guest the enemies stay frozen copies, so nobody is seen attacking B. Next: replicate
   the host enemies' attack moves (PlayCombatAnimation #940 = `0x48ff20`, style-specific move index).
+### Attack animations on the guest (session of 2026-11-21, branch `re/target`, not released)
+- Logged every call of the engine's animation entry `FUN_00443d80(ctrl = creature+0x358, req[16
+  dwords], flag)` (RE build, 6-byte entry patch): 181 requests in 12 s; enemy requests are rare, e.g.
+  `[200, 5, 52, ptr|1, 1.0f, 0, 0, 1, 0, ...]`; req[3] is a host pointer (tagged with bit 0).
+- Replaying such a request on a guest enemy (`je.animPlay`, with req[3] = 0 or the puppet's
+  pointer|1) returned 1 but showed nothing (owner). `PlayCombatAnimation` (#940) returned 1 for
+  move indexes 0-3 of the enemy's style and 1-3 of the player's, also with the combat sync paused:
+  nothing visible on either (owner). Not usable as found.
+- What works instead (owner saw it): on the guest, give each enemy its AI back and the same opponent
+  as on the host (the host's puppet via the wanted-target slot, else the guest's player); it attacks
+  with its normal animations and stands roughly where the host's does (position corrected only
+  beyond 6 m). Only the host's hits may count, so the guest heals its player back after local hits
+  (`EffectModifyHealth(+d)`, #746) and keeps a minimum health of 1 (lowered to 0 for a lethal host hit).
+- Bugs found in the heal-back (fighttest, mock steam): 790 heals counted for a few hits; then B 70
+  with 57 host damage (a host hit read too early and healed back: the damage effect reaches GetHealth
+  later); then B 1 with 70 host damage (expected health taken from a reading that still held an
+  unhealed local hit). Current fix (build 3b919144, NOT yet run): expected = previous expected - host
+  hit, no judging for 600 ms after a host hit, 300 ms between heals; first 30 heals logged.
+- New fighttest check "B's health = start - host damage" catches both bugs (it failed on 88e1261e).
+  On 88e1261e "B's player loses health when A's enemy hits B's puppet" also failed once: no host hit
+  on the puppet within 20 s (cause unknown, maybe distance).
