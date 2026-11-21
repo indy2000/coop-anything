@@ -981,3 +981,16 @@ door worked".
   4/4 passed (B matches A's 2 enemies; A sets hp 25 -> 22, B shows 22; B hits for 4, A goes
   22 -> 18; A kills enemy 1, it dies on B). Mutation run (`--mutate`, combat sync off on B):
   0/1, fails as it must. Not yet tested over real Steam between two PCs.
+
+### 0.10.1: two bugs from the first real two-PC combat test
+Owner + friend, real Steam, 0.10.0. Observed: (1) hits went both ways, but an enemy the friend
+(guest) killed was hurt, not dead, on the host; (2) after both reloaded the save, the guest's enemies
+fell dead right after the cutscene while the host's were fine.
+Causes (from the code): (1) the guest checked "dead locally" before "health dropped", so the killing
+blow was never sent; (2) the guest kept the host's last snapshot from the previous fight and matched
+its new enemies (same tags, same places) to those dead ones. Fix: the guest sends a kill when its
+enemy dies first; snapshots carry a fight id, are cleared at fight start, used only while in a fight
+and only if under 1.5 s old.
+QA (mock steam, two local copies): fighttest 6/6, then the same 6/6 after reloading the save in
+both copies. New checks: "B kills enemy: it dies in A", "no enemy dead on B while A's is alive".
+Not shown: that the reload check fails on 0.10.0 (not rerun with the old build).
