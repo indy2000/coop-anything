@@ -962,3 +962,22 @@ mode READ only, a reader can make it drop lines). Next: canary + change log for 
 that does not drop lines, then rerun `client/fighttest.py`.
 Real two-PC test of 0.9.1 (owner + friend, real Steam): owner: "the scene transition after the
 door worked".
+
+### Combat v1: crash and flag reset found (same cause), automated check passes
+- Observed: copy B crashed in the guest's health-set path with ESI = 0xFFFFFFFF right after one of
+  our own functions returned (3 builds, 3 crash sites, all reading through ESI). Host: the in-fight
+  flag was zeroed between frames ("FLAG CHANGED OUTSIDE cb_tick", 88 times); a hardware write watch
+  on the main thread did not catch it.
+- Cause (derived from Ghidra, confirmed by the fix): `CExoString` is **12 bytes** in build 1510. The
+  ctor `0x006534B0` writes `p`, `n` and a third field (`0xFFFFFFFF`, or a pool id when
+  `DAT_007ee6bc == 1`). The mod declared 8 bytes, so the third write landed on the next stack slot:
+  in `vm_run` that was the saved ESI of the caller. Fix: struct is 16 bytes (12 + slack).
+- Also added (defensive, not the cause): the engine-call wrapper restores ESP from a register and
+  records any stack imbalance (none logged), a re-entry guard on the frame hook (re-entries: 0), and
+  a register + stack dump in the crash log.
+- Lesson for the playbook: check the size of every engine struct you put on your own stack
+  against the ctor, not just the fields you use.
+- QA (mock steam_api, two local copies, owner's Dawn Star save): `client/fighttest.py check`
+  4/4 passed (B matches A's 2 enemies; A sets hp 25 -> 22, B shows 22; B hits for 4, A goes
+  22 -> 18; A kills enemy 1, it dies on B). Mutation run (`--mutate`, combat sync off on B):
+  0/1, fails as it must. Not yet tested over real Steam between two PCs.
