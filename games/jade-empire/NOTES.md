@@ -996,3 +996,30 @@ both copies. New checks: "B kills enemy: it dies in A", "no enemy dead on B whil
 Not shown: that the reload check fails on 0.10.0 (not rerun with the old build).
 Real two-PC test of 0.10.1 (owner + friend, real Steam): owner: deaths sync precisely, and stay in
 sync after reloading the save (both cases that failed on 0.10.0).
+
+### 0.11.0: enemies fight the guest (split ownership)
+Observed on the host (copy A, owner's Dawn Star save, during a fight; puppet = slot 192):
+- Before: puppet standard faction -1, faction 50; `GetIsEnemy`-style #235 read 50 for puppet vs
+  enemy and 0 for player vs enemy (looks like a reputation value, unknown).
+- `ChangeFaction(puppet, player)` (#173) made it 0/0 (hostile like the player), but enemies kept
+  targeting only the host's player. `LockCombatTarget(enemy, puppet)` (#37) returned 1, no effect.
+  Puppet combat AI on + `SetCombatTeam(puppet, 0)` (#768): no effect, the puppet did not fight either.
+  Puppet health stayed 10000 the whole time. Conclusion (derived): through scripts, enemies only
+  pick the player as a target.
+- On the guest, a frozen enemy still turns toward a player who hits it (owner).
+Design (owner chose "local AI for the nearest enemy, RE of the AI later if it plays badly"):
+- Guest: the nearest alive matched enemy within 6 m gets `SetDisableCreatureCombatAI(o, FALSE)` and
+  fights the guest's player locally; kept until dead or > 10 m away; its position is not synced.
+- Owner then saw that enemy attack both players at once (one in each game). So the guest reports it
+  ('JEEN', reliable channel 1, every 500 ms: host index, tag, local x/y/z; -1 = released) and the
+  host turns that enemy's AI off and walks it to where it is in the guest's game (next to the
+  puppet). Released after -1 or 2 s without a report. Owner: on A that enemy then left the host
+  alone and stayed by the guest's puppet.
+- Health and deaths stay host-authoritative as in 0.10.1.
+QA (mock steam, two local copies): fighttest 8/8 (new: "B: an enemy fights B's player", B hp
+120 -> 93; "A: the enemy B fights is handed to B", enemy 3.77 m from the puppet, limit 4 m).
+Mutation `--mutate-engage` (no engagement on B): the engage check FAILs as it must; the run then
+stopped on a status reply missing its combat block (test tool now retries; seen once).
+Test prep also takes the companion out of the world (`DeactivateHenchman(GetSelectedHenchman())`,
+#311) on both copies, at the owner's request: she sometimes killed the enemies in A.
+Not yet: attack animations of that enemy on the host; not tested over real Steam.
